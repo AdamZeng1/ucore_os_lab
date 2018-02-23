@@ -201,8 +201,8 @@ dup_mmap(struct mm_struct *to, struct mm_struct *from) {
 
         insert_vma_struct(to, nvma);
 
-        bool share = 0;
-        if (copy_range(to->pgdir, from->pgdir, vma->vm_start, vma->vm_end, share) != 0) {
+        bool cow = 1;
+        if (copy_range(to->pgdir, from->pgdir, vma->vm_start, vma->vm_end, cow) != 0) {
             return -E_NO_MEM;
         }
     }
@@ -479,18 +479,37 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
 		  2) *ptep & PTE_P == 0 & but *ptep!=0, it means this pte is a  swap entry.
 		     We should add the LAB3's results here.
      */
-        if (swap_init_ok) {
-            struct Page *page=NULL;
-            swap_in(mm, addr, &page); //(1)According to the mm AND addr, try to load the content of right disk page
-                                      //    into the memory which page managed.
-            page_insert(mm->pgdir, page, addr, perm); //(2) According to the mm, addr AND page, setup the map of phy addr <---> logical addr
-            swap_map_swappable(mm, addr, page, 1); //(3) make the page swappable.
-            page->pra_vaddr = addr;
-                                    //(4) [NOTICE]: you myabe need to update your lab3's implementation for LAB5's normal execution.
-        }
-        else {
-            cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
-            goto failed;
+        if (*ptep & PTE_P) { // COW
+            assert((error_code & 3) == 3);
+            struct Page *shared_page = pte2page(*ptep);
+            cprintf("COW (pid=%d): addr=0x%08x\n", current->pid, addr);
+            // TODO: lock?
+            cprintf("COW (pid=%d): page_ref(shared_page) = %d\n", current->pid, page_ref(shared_page));
+            if (page_ref(shared_page) == 1) {
+                *ptep |= PTE_W;
+                tlb_invalidate(mm->pgdir, addr);
+            } else {
+                struct Page *new_page = pgdir_alloc_page(mm->pgdir, addr, perm);
+                assert(new_page != NULL);
+                const void *src_kvaddr = page2kva(shared_page);
+                void *dst_kvaddr = page2kva(new_page);
+                memcpy(dst_kvaddr, src_kvaddr, PGSIZE);
+                cprintf("COW (pid=%d): copied\n", current->pid);
+            }
+        } else {
+            if (swap_init_ok) {
+                struct Page *page=NULL;
+                swap_in(mm, addr, &page); //(1)According to the mm AND addr, try to load the content of right disk page
+                                          //    into the memory which page managed.
+                page_insert(mm->pgdir, page, addr, perm); //(2) According to the mm, addr AND page, setup the map of phy addr <---> logical addr
+                swap_map_swappable(mm, addr, page, 1); //(3) make the page swappable.
+                page->pra_vaddr = addr;
+                                        //(4) [NOTICE]: you myabe need to update your lab3's implementation for LAB5's normal execution.
+            }
+            else {
+                cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+                goto failed;
+            }
         }
    }
    ret = 0;
