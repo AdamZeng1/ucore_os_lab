@@ -1,6 +1,6 @@
 #include <swap.h>
 #include <swapfs.h>
-#include <swap_extclk.h>
+#include <swap_extclk_dirty.h>
 #include <stdio.h>
 #include <string.h>
 #include <memlayout.h>
@@ -38,7 +38,7 @@ swap_init(void)
      }
      
 
-     sm = &swap_manager_extclk;
+     sm = &swap_manager_extclk_dirty;
      int r = sm->init();
      
      if (r == 0)
@@ -99,16 +99,20 @@ swap_out(struct mm_struct *mm, int n, int in_tick)
           v=page->pra_vaddr; 
           pte_t *ptep = get_pte(mm->pgdir, v, 0);
           assert((*ptep & PTE_P) != 0);
-
-          if (swapfs_write( (page->pra_vaddr/PGSIZE+1)<<8, page) != 0) {
-                    cprintf("SWAP: failed to save\n");
-                    sm->map_swappable(mm, v, page, 0);
-                    continue;
-          }
-          else {
-                    cprintf("swap_out: i %d, store page in vaddr 0x%x to disk swap entry %d\n", i, v, page->pra_vaddr/PGSIZE+1);
-                    *ptep = (page->pra_vaddr/PGSIZE+1)<<8;
-                    free_page(page);
+          if (*ptep & PTE_D) {
+              if (swapfs_write( (page->pra_vaddr/PGSIZE+1)<<8, page) != 0) {
+                  cprintf("SWAP: failed to save\n");
+                  sm->map_swappable(mm, v, page, 0);
+                  continue;
+              }
+              else {
+                  cprintf("swap_out: i %d, store page in vaddr 0x%x to disk swap entry %d\n", i, v, page->pra_vaddr/PGSIZE+1);
+                  *ptep = (page->pra_vaddr/PGSIZE+1)<<8;
+                  free_page(page);
+              }
+          } else {
+              *ptep = (page->pra_vaddr/PGSIZE+1)<<8;
+              free_page(page);
           }
           
           tlb_invalidate(mm->pgdir, v);
