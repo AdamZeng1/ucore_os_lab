@@ -327,8 +327,10 @@ pmm_init(void) {
     //then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS
     gdt_init();
 
-    //disable the map of virtual_addr 0~4M
-    boot_pgdir[0] = 0;
+    if (PDX(KERNBASE) != 0) {
+        //disable the map of virtual_addr 0~4M
+        boot_pgdir[0] = 0;
+    }
 
     //now the basic virtual memory map(see memalyout.h) is established.
     //check the correctness of the basic virtual memory map.
@@ -537,25 +539,27 @@ check_boot_pgdir(void) {
 
     assert(PDE_ADDR(boot_pgdir[PDX(VPT)]) == PADDR(boot_pgdir));
 
-    assert(boot_pgdir[0] == 0);
+    if (PDX(KERNBASE) != 0) {
+        assert(boot_pgdir[0] == 0);
+    }
 
     struct Page *p;
     p = alloc_page();
-    assert(page_insert(boot_pgdir, p, 0x100, PTE_W) == 0);
+    assert(page_insert(boot_pgdir, p, 0x80000100, PTE_W) == 0);
     assert(page_ref(p) == 1);
-    assert(page_insert(boot_pgdir, p, 0x100 + PGSIZE, PTE_W) == 0);
+    assert(page_insert(boot_pgdir, p, 0x80000100 + PGSIZE, PTE_W) == 0);
     assert(page_ref(p) == 2);
 
     const char *str = "ucore: Hello world!!";
-    strcpy((void *)0x100, str);
-    assert(strcmp((void *)0x100, (void *)(0x100 + PGSIZE)) == 0);
+    strcpy((void *)0x80000100, str);
+    assert(strcmp((void *)0x80000100, (void *)(0x80000100 + PGSIZE)) == 0);
 
     *(char *)(page2kva(p) + 0x100) = '\0';
-    assert(strlen((const char *)0x100) == 0);
+    assert(strlen((const char *)0x80000100) == 0);
 
     free_page(p);
-    free_page(pde2page(boot_pgdir[0]));
-    boot_pgdir[0] = 0;
+    free_page(pde2page(boot_pgdir[PDX(0x80000100)]));
+    boot_pgdir[PDX(0x80000100)] = 0;
 
     cprintf("check_boot_pgdir() succeeded!\n");
 }
