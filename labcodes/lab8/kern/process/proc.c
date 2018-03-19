@@ -740,6 +740,11 @@ load_icode(int fd, int argc, char **kargv) {
         uargv[i] = (char *)tf->tf_esp;
         strcpy(uargv[i], kargv[i]);
     }
+    // 4B aligned
+    while (tf->tf_esp % sizeof(uintptr_t) != 0) {
+        --tf->tf_esp;
+        *(char *)tf->tf_esp = 0;
+    }
     // push array of argv
     tf->tf_esp -= sizeof(char *) * (argc + 1);
     memcpy((char **)tf->tf_esp, uargv, sizeof(char *) * (argc + 1));
