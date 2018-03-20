@@ -107,7 +107,8 @@ alloc_proc(void) {
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
         memset(proc, 0, sizeof(struct proc_struct));
-        proc->cr3 = rcr3();
+        proc->pid = -1;
+        proc->cr3 = boot_cr3;
      //LAB5 2015011278 : (update LAB4 steps)
     /*
      * below fields(add in LAB5) in proc_struct need to be initialized	
@@ -473,9 +474,14 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
         goto bad_fork_cleanup_fs;
     }
     copy_thread(proc, stack, tf);
-    proc->pid = get_pid();
-    hash_proc(proc);
-    set_links(proc);
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc);
+        set_links(proc);
+    }
+    local_intr_restore(intr_flag);
     wakeup_proc(proc);
     ret = proc->pid;
 	//LAB5 2015011278 : (update LAB4 steps)
@@ -716,6 +722,7 @@ load_icode(int fd, int argc, char **kargv) {
     current->mm = mm;
     current->cr3 = PADDR(mm->pgdir);
     lcr3(PADDR(mm->pgdir));
+    memset((void *)(USTACKTOP - 4 * PGSIZE), 0, 4 * PGSIZE);
 
     struct trapframe *tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
@@ -734,6 +741,8 @@ load_icode(int fd, int argc, char **kargv) {
         uargv[i] = (char *)tf->tf_esp;
         strcpy(uargv[i], kargv[i]);
     }
+    // 4B aligned
+    tf->tf_esp = ROUNDDOWN(tf->tf_esp, sizeof(uintptr_t));
     // push array of argv
     tf->tf_esp -= sizeof(char *) * (argc + 1);
     memcpy((char **)tf->tf_esp, uargv, sizeof(char *) * (argc + 1));
