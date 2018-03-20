@@ -22,10 +22,9 @@ kern_entry:
     jmp *%eax
 next:
 
-    # unmap va 0 ~ 8M, it's temporary mapping
+    # unmap va 0 ~ 4M, it's temporary mapping
     xorl %eax, %eax
     movl %eax, __boot_pgdir
-    movl %eax, __boot_pgdir + 4
 
     # set ebp, esp
     movl $0x0, %ebp
@@ -49,20 +48,18 @@ bootstacktop:
 
 # kernel builtin pgdir
 # an initial page directory (Page Directory Table, PDT)
+# These page directory table and page table can be reused!
 .section .data.pgdir
 .align PGSIZE
 __boot_pgdir:
 .globl __boot_pgdir
-    # map va 0 ~ 8M to pa 0 ~ 8M (temporary)
+    # map va 0 ~ 4M to pa 0 ~ 4M (temporary)
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
-    .long REALLOC(__boot_pt2) + (PTE_P | PTE_U | PTE_W)
     .space (KERNBASE / PGSIZE / 1024 * 4) - (. - __boot_pgdir) # pad to PDE for KERNBASE
-    # map va KERNBASE + (0 ~ 8M) to pa 0 ~ 8M
+    # map va KERNBASE + (0 ~ 4M) to pa 0 ~ 4M
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
-    .long REALLOC(__boot_pt2) + (PTE_P | PTE_U | PTE_W)
     .space PGSIZE - (. - __boot_pgdir) # pad to PGSIZE
 
-# these page tables can be reused!
 .set i, 0
 __boot_pt1:
 .rept 1024
@@ -70,8 +67,3 @@ __boot_pt1:
     .set i, i + 1
 .endr
 
-__boot_pt2:
-.rept 1024
-    .long i * PGSIZE + (PTE_P | PTE_W)
-    .set i, i + 1
-.endr

@@ -253,17 +253,6 @@ page_init(void) {
     }
 }
 
-static void
-enable_paging(void) {
-    lcr3(boot_cr3);
-
-    // turn on paging
-    uint32_t cr0 = rcr0();
-    cr0 |= CR0_PE | CR0_PG | CR0_AM | CR0_WP | CR0_NE | CR0_TS | CR0_EM | CR0_MP;
-    cr0 &= ~(CR0_TS | CR0_EM);
-    lcr0(cr0);
-}
-
 //boot_map_segment - setup&enable the paging mechanism
 // parameters
 //  la:   linear address of this memory need to map (after x86 segment map)
