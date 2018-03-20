@@ -722,6 +722,7 @@ load_icode(int fd, int argc, char **kargv) {
     current->mm = mm;
     current->cr3 = PADDR(mm->pgdir);
     lcr3(PADDR(mm->pgdir));
+    memset((void *)(USTACKTOP - 4 * PGSIZE), 0, 4 * PGSIZE);
 
     struct trapframe *tf = current->tf;
     memset(tf, 0, sizeof(struct trapframe));
@@ -741,10 +742,7 @@ load_icode(int fd, int argc, char **kargv) {
         strcpy(uargv[i], kargv[i]);
     }
     // 4B aligned
-    while (tf->tf_esp % sizeof(uintptr_t) != 0) {
-        --tf->tf_esp;
-        *(char *)tf->tf_esp = 0;
-    }
+    tf->tf_esp = ROUNDDOWN(tf->tf_esp, sizeof(uintptr_t));
     // push array of argv
     tf->tf_esp -= sizeof(char *) * (argc + 1);
     memcpy((char **)tf->tf_esp, uargv, sizeof(char *) * (argc + 1));
