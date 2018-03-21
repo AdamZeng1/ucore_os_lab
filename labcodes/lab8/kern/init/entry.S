@@ -16,6 +16,7 @@ kern_entry:
     andl $~(CR0_TS | CR0_EM), %eax
     movl %eax, %cr0
 
+    # update eip
     # now, eip = 0x1.....
     leal next, %eax
     # set eip = KERNBASE + 0x1.....
@@ -55,7 +56,7 @@ __boot_pgdir:
 .globl __boot_pgdir
     # map va 0 ~ 4M to pa 0 ~ 4M (temporary)
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
-    .space (KERNBASE / PGSIZE / 1024 * 4) - (. - __boot_pgdir) # pad to PDE for KERNBASE
+    .space (KERNBASE / PGSIZE / 1024 * 4) - (. - __boot_pgdir) # pad to PDE of KERNBASE
     # map va KERNBASE + (0 ~ 4M) to pa 0 ~ 4M
     .long REALLOC(__boot_pt1) + (PTE_P | PTE_U | PTE_W)
     .space PGSIZE - (. - __boot_pgdir) # pad to PGSIZE

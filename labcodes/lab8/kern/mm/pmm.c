@@ -288,6 +288,7 @@ boot_alloc_page(void) {
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
 void
 pmm_init(void) {
+    // We've already enabled paging
     boot_cr3 = PADDR(boot_pgdir);
 
     //We need to alloc/free the physical memory (granularity is 4KB or other size). 
@@ -317,9 +318,9 @@ pmm_init(void) {
     boot_map_segment(boot_pgdir, KERNBASE, KMEMSIZE, 0, PTE_W);
 
     // Since we are using bootloader's GDT,
-    // we should reload gdt (second time, the last time) to map all physical memory
-    // virtual_addr 0 ~ 4G = linear_addr 0 ~ 4G
-    // then set kernel stack(ss:esp) in TSS, setup TSS in gdt, load TSS
+    // we should reload gdt (second time, the last time) to get user segments and the TSS
+    // map virtual_addr 0 ~ 4G = linear_addr 0 ~ 4G
+    // then set kernel stack (ss:esp) in TSS, setup TSS in gdt, load TSS
     gdt_init();
 
     //now the basic virtual memory map(see memalyout.h) is established.
