@@ -251,14 +251,10 @@ copy_mm(uint32_t clone_flags, struct proc_struct *proc) {
 //             - setup the kernel entry point and stack of process
 static void
 copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
-    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
-    *(proc->tf) = *tf;
-    proc->tf->tf_regs.reg_eax = 0;
-    proc->tf->tf_esp = esp;
-    proc->tf->tf_eflags |= FL_IF;
-
-    proc->context.eip = (uintptr_t)forkret;
-    proc->context.esp = (uintptr_t)(proc->tf);
+    proc->context.eip = (uintptr_t)kernel_thread_entry;
+    proc->context.ebx = tf->tf_regs.reg_ebx;
+    proc->context.edx = tf->tf_regs.reg_edx;
+    proc->context.esp = (uintptr_t)(proc->kstack + KSTACKSIZE);
 }
 
 /* do_fork -     parent process for a new child process
